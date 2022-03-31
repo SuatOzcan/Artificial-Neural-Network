@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ANN : MonoBehaviour {
+public class ANN  {
 
 	public int numInputs;
 	public int numOutputs;
@@ -51,6 +51,7 @@ public class ANN : MonoBehaviour {
         }
 
 		inputs = new List<double>(inputValues);
+
         for (int i = 0; i < numHidden + 1; i++)
         {
             if (i>0)
@@ -59,17 +60,83 @@ public class ANN : MonoBehaviour {
             }
 			outputs.Clear();
 
+            for (int j = 0; j < layers[i].numNeurons; j++)
+            {
+				double N = 0;
+				layers[i].neurons[j].inputs.Clear();
+
+                for (int k = 0; k < layers[i].neurons[j].numInputs; k++)
+                {
+					layers[i].neurons[j].inputs.Add(inputs[k]);
+					N += layers[i].neurons[j].weights[k] * inputs[k];
+                }
+
+				N -= layers[i].neurons[j].bias;
+				layers[i].neurons[j].output = ActivationFunction(N);
+				outputs.Add(layers[i].neurons[j].output);
+            }
         }
 
+		UpdateWeights(outputs, desiredOutput);
+
+		return outputs;
+
+    }
+	void UpdateWeights(List<double> outputs,List<double> desiredOutput)
+    {
+		double error;
+        //Because error is calculated at the end, it is distributed backwards.
+        for (int i = numHidden; i>= 0 ; i--)
+        {
+            for (int j = 0; j < layers[i].numNeurons; j++)
+            {
+                if (i==numHidden)
+                {
+					error = desiredOutput[j] - outputs[j];
+					layers[i].neurons[j].errorGradient = outputs[j] * (1 - outputs[j]) * error;
+					//Error gradient is calculated with Delta rule.
+                }
+                else
+                {
+					layers[i].neurons[j].errorGradient = layers[i].neurons[j].output * (1 - layers[i].neurons[j].output);
+					double errorGradSum = 0;
+                    for (int p = 0; p < layers[i+1].numNeurons; p++)
+                    {
+						errorGradSum += layers[i + 1].neurons[p].errorGradient * layers[i + 1].neurons[p].weights[j];
+                    }
+					layers[i].neurons[j].errorGradient *= errorGradSum;
+                }
+                for (int k = 0; k < layers[i].neurons[j].numInputs; k++)
+                {
+                    if (i==numHidden)
+                    {
+						error = desiredOutput[j] - outputs[j];
+						layers[i].neurons[j].weights[k] += alpha * layers[i].neurons[j].inputs[k] * error;
+                    }
+                    else
+                    {
+						layers[i].neurons[j].weights[k] += alpha * layers[i].neurons[j].inputs[k] * layers[i].neurons[j].errorGradient;
+                    }
+                }
+				layers[i].neurons[j].bias += alpha * -1 * layers[i].neurons[j].errorGradient;
+            }
+        }
     }
 
-	// Use this for initialization
-	void Start () {
-		
-	}
-	
-	// Update is called once per frame
-	void Update () {
-		
-	}
+	double ActivationFunction(double value)
+    {
+		return Sigmoid(value);
+    }
+
+	double Sigmoid (double value)//(aka logical softstep  function)
+    {
+		double k = (double)System.Math.Exp(value);
+		return k / (1.0f + k);
+    }
+
+	double Step(double value)//(aka binary step function)
+    {
+		if (value < 0) return 0;
+		else return 1;
+    }
 }
